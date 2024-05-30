@@ -29,7 +29,6 @@ public class Startup
         string audience = model.Audience;
         string secretKey = model.SecretKey;
 
-        //string connectionString = Configuration.GetConnectionString("MySql");
         string connectionString = model.ConnectionString;
 
         services.AddTransient<HelperPathProvider>();
