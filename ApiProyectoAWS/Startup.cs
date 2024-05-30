@@ -1,4 +1,5 @@
 using ApiProyectoAWS.Data;
+using ApiProyectoAWS.Helpers;
 using ApiProyectoAWS.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
@@ -18,12 +19,20 @@ public class Startup
     public void ConfigureServices(IServiceCollection services)
     {
         string connectionString = Configuration.GetConnectionString("MySql");
+
+        services.AddTransient<HelperPathProvider>();
+        services.AddTransient<HelperCryptography>();
+        services.AddTransient<HelperMails>();
+        services.AddTransient<HelperTools>();
+
         services.AddTransient<RepositoryEventos>();
         services.AddDbContext<EventosContext>(options =>
-        options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+            options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+
         services.AddCors(options => {
             options.AddPolicy("AllowOrigin", x => x.AllowAnyOrigin());
         });
+
         services.AddSwaggerGen(options => {
             options.SwaggerDoc("v1", new OpenApiInfo
             {
@@ -31,9 +40,14 @@ public class Startup
                 Version = "v1",
             });
         });
-        services.AddControllers();
-    }
 
+        services.AddControllers();
+
+        HelperActionServicesOAuth helper = new HelperActionServicesOAuth(Configuration);
+        services.AddSingleton<HelperActionServicesOAuth>(helper);
+        services.AddAuthentication(helper.GetAuthenticateSchema()).AddJwtBearer(helper.GetJwtBearerOptions());
+
+    }
 
     // This method gets called by the runtime. Use this method to configure the HTTP request pipeline
     public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
@@ -43,21 +57,19 @@ public class Startup
             app.UseDeveloperExceptionPage();
         }
 
-        app.UseCors(options => options.AllowAnyOrigin());
-
+        app.UseCors("AllowOrigin");
 
         app.UseSwagger();
         app.UseSwaggerUI(options => {
-            options.SwaggerEndpoint(url: "swagger/v1/swagger.json",
-            "ApiProyectoAWS");
-            options.RoutePrefix = "";
+            options.SwaggerEndpoint("/swagger/v1/swagger.json", "Api Proyecto AWS v1");
+            options.RoutePrefix = string.Empty;
         });
-
 
         app.UseHttpsRedirection();
 
         app.UseRouting();
-
+        app.UseStaticFiles();
+        app.UseAuthentication();
         app.UseAuthorization();
 
         app.UseEndpoints(endpoints =>
