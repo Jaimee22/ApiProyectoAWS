@@ -1,8 +1,11 @@
+using ApiCoreProyectoEventos.Helpers;
+using ApiCoreProyectoEventos.Models;
 using ApiProyectoAWS.Data;
 using ApiProyectoAWS.Helpers;
 using ApiProyectoAWS.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using Newtonsoft.Json;
 
 namespace ApiProyectoAWS;
 
@@ -18,7 +21,16 @@ public class Startup
     // This method gets called by the runtime. Use this method to add services to the container
     public void ConfigureServices(IServiceCollection services)
     {
-        string connectionString = Configuration.GetConnectionString("MySql");
+        // Obtener el secreto
+        string miSecreto = HelperSecretManager.GetSecretAsync().GetAwaiter().GetResult();
+        KeysModel model = JsonConvert.DeserializeObject<KeysModel>(miSecreto);
+
+        string issuer = model.Issuer;
+        string audience = model.Audience;
+        string secretKey = model.SecretKey;
+
+        //string connectionString = Configuration.GetConnectionString("MySql");
+        string connectionString = model.ConnectionString;
 
         services.AddTransient<HelperPathProvider>();
         services.AddTransient<HelperCryptography>();
@@ -29,11 +41,13 @@ public class Startup
         services.AddDbContext<EventosContext>(options =>
             options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
-        services.AddCors(options => {
+        services.AddCors(options =>
+        {
             options.AddPolicy("AllowOrigin", x => x.AllowAnyOrigin());
         });
 
-        services.AddSwaggerGen(options => {
+        services.AddSwaggerGen(options =>
+        {
             options.SwaggerDoc("v1", new OpenApiInfo
             {
                 Title = "Api Proyecto AWS",
@@ -43,7 +57,7 @@ public class Startup
 
         services.AddControllers();
 
-        HelperActionServicesOAuth helper = new HelperActionServicesOAuth(Configuration);
+        HelperActionServicesOAuth helper = new HelperActionServicesOAuth(issuer, audience, secretKey);
         services.AddSingleton<HelperActionServicesOAuth>(helper);
         services.AddAuthentication(helper.GetAuthenticateSchema()).AddJwtBearer(helper.GetJwtBearerOptions());
 
@@ -60,7 +74,8 @@ public class Startup
         app.UseCors("AllowOrigin");
 
         app.UseSwagger();
-        app.UseSwaggerUI(options => {
+        app.UseSwaggerUI(options =>
+        {
             options.SwaggerEndpoint("/swagger/v1/swagger.json", "Api Proyecto AWS v1");
             options.RoutePrefix = string.Empty;
         });
